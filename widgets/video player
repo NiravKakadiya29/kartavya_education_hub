@@ -1,0 +1,41 @@
+flutter pub add video_player
+import 'package:video_player/video_player.dart';
+
+  late VideoPlayerController _controller;
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    _controller =
+        VideoPlayerController.asset('./assets/animations/splashscreen.mp4')
+          ..initialize().then((_) {
+            setState(() {});
+          })
+          ..setVolume(0.0);
+    _playVideo();
+  }
+
+  void _playVideo() async {
+    _controller.play();
+    await Future.delayed(Duration(seconds: 4));
+    Navigator.pushNamed(context, '/');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    // TODO: implement dispose
+    super.dispose();
+  }
+
+in main ===========>>>>
+
+Center(
+        child: _controller.value.isInitialized
+            ? AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: VideoPlayer(_controller),
+              )
+            : Container(),
+      ),
