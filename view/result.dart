@@ -26,11 +26,33 @@ class _ResultPageState extends State<ResultPage> {
     print("mobile number is $mobile_number");
   }
 
+  @override
+  void initState() {
+    initializeData();
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Test Results'),
+      ),
+      body: TestResultsList(),
+    );
+  }
+}
+
+class TestResultsList extends StatefulWidget {
+  @override
+  State<TestResultsList> createState() => _TestResultsListState();
+}
+
+class _TestResultsListState extends State<TestResultsList> {
   late Stream<QuerySnapshot> _examsStream;
 
   @override
   void initState() {
-    initializeData();
     super.initState();
     _examsStream = FirebaseFirestore.instance
         .collection('users')
@@ -55,42 +77,36 @@ class _ResultPageState extends State<ResultPage> {
           case ConnectionState.waiting:
             return Text('Loading....');
           default:
-            Map<DateTime, List<DocumentSnapshot>> examsByDate = {};
-            snapshot.data!.docs.forEach((examDoc) {
-              String dateString = examDoc['date'];
-              DateTime date = DateFormat('dd MMMM yyyy').parse(dateString);
-              if (!examsByDate.containsKey(date)) {
-                examsByDate[date] = [];
-              }
-              examsByDate[date]!.add(examDoc);
-            });
+            // Get the list of documents
+            List<DocumentSnapshot> docs = snapshot.data!.docs;
 
+            // Map each document to a map containing the document and its parsed date
+            List<Map<String, dynamic>> sortedExamDataList = docs.map((examDoc) {
+              DateTime date = DateFormat('dd MM yyyy').parse(examDoc['date']);
+
+              return {
+                'examDoc': examDoc,
+                'date': date,
+              };
+            }).toList();
+
+            // Sort the list of maps based on the parsed date
+            sortedExamDataList.sort((a, b) => (b['date']).compareTo(a['date']));
+
+            // Return the ListView with sorted data
             return ListView.builder(
-              itemCount: examsByDate.keys.length,
+              itemCount: sortedExamDataList.length,
               itemBuilder: (context, index) {
-                DateTime date = examsByDate.keys.elementAt(index);
-                List<DocumentSnapshot> exams = examsByDate[date]!;
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        '${date.day}/${date.month}/${date.year}',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    ...exams.map((examDoc) {
-                      return Card(
-                        child: ListTile(
-                          title: Text(examDoc['subject']),
-                          subtitle: Text(
-                            'Marks: ${examDoc['marks']} / ${examDoc['total']}',
-                          ),
-                        ),
-                      );
-                    }),
-                  ],
+                DocumentSnapshot examDoc = sortedExamDataList[index]['examDoc'];
+                DateTime date = sortedExamDataList[index]['date'];
+
+                return ListTile(
+                  title: Text(examDoc['subject']),
+                  subtitle: Text(
+                    'Marks: ${examDoc['marks']} / ${examDoc['total']}',
+                  ),
+                  trailing: Text(DateFormat('dd/MM/yyyy')
+                      .format(date)), // Use formatted date here
                 );
               },
             );
