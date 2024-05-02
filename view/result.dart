@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-String? mobile_number;
+String? mobileNumber;
 
 Future<String?> getMobileNumber() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -16,34 +16,37 @@ class ResultPage extends StatefulWidget {
 }
 
 class _ResultPageState extends State<ResultPage> {
-  Future<void> retrieveData() async {
-    mobile_number = await getMobileNumber();
-    print(mobile_number);
-  }
-
-  Future<void> initializeData() async {
-    await retrieveData();
-    print("mobile number is $mobile_number");
-  }
-
-  @override
-  void initState() {
-    initializeData();
-    super.initState();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Test Results'),
       ),
-      body: TestResultsList(),
+      body: FutureBuilder<String?>(
+        future: getMobileNumber(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(
+              child: CircularProgressIndicator(),
+            );
+          } else if (snapshot.hasData && snapshot.data != null) {
+            return TestResultsList(mobileNumber: snapshot.data!);
+          } else {
+            return Center(
+              child: Text('No mobile number found!'),
+            );
+          }
+        },
+      ),
     );
   }
 }
 
 class TestResultsList extends StatefulWidget {
+  final String mobileNumber;
+
+  TestResultsList({required this.mobileNumber});
+
   @override
   State<TestResultsList> createState() => _TestResultsListState();
 }
@@ -54,14 +57,20 @@ class _TestResultsListState extends State<TestResultsList> {
   @override
   void initState() {
     super.initState();
-    _examsStream = FirebaseFirestore.instance
-        .collection('users')
-        .doc('students')
-        .collection('students')
-        .doc(mobile_number)
-        .collection('exams')
-        .orderBy('date', descending: true)
-        .snapshots();
+    _initializeData();
+  }
+
+  void _initializeData() async {
+    setState(() {
+      _examsStream = FirebaseFirestore.instance
+          .collection('users')
+          .doc('students')
+          .collection('students')
+          .doc(widget.mobileNumber)
+          .collection('exams')
+          .orderBy('date', descending: true)
+          .snapshots();
+    });
   }
 
   @override
@@ -75,12 +84,14 @@ class _TestResultsListState extends State<TestResultsList> {
 
         switch (snapshot.connectionState) {
           case ConnectionState.waiting:
-            return Text('Loading....');
+            return Center(
+              child: Text(
+                'Loading....',
+                style: TextStyle(fontSize: 20, letterSpacing: 5),
+              ),
+            );
           default:
-            // Get the list of documents
             List<DocumentSnapshot> docs = snapshot.data!.docs;
-
-            // Map each document to a map containing the document and its parsed date
             List<Map<String, dynamic>> sortedExamDataList = docs.map((examDoc) {
               DateTime date = DateFormat('dd MM yyyy').parse(examDoc['date']);
 
@@ -90,23 +101,22 @@ class _TestResultsListState extends State<TestResultsList> {
               };
             }).toList();
 
-            // Sort the list of maps based on the parsed date
             sortedExamDataList.sort((a, b) => (b['date']).compareTo(a['date']));
 
-            // Return the ListView with sorted data
             return ListView.builder(
               itemCount: sortedExamDataList.length,
               itemBuilder: (context, index) {
                 DocumentSnapshot examDoc = sortedExamDataList[index]['examDoc'];
                 DateTime date = sortedExamDataList[index]['date'];
 
-                return ListTile(
-                  title: Text(examDoc['subject']),
-                  subtitle: Text(
-                    'Marks: ${examDoc['marks']} / ${examDoc['total']}',
+                return Card(
+                  child: ListTile(
+                    title: Text(examDoc['subject']),
+                    subtitle: Text(
+                      'Marks: ${examDoc['marks']} / ${examDoc['total']}',
+                    ),
+                    trailing: Text(DateFormat('dd/MM/yyyy').format(date)),
                   ),
-                  trailing: Text(DateFormat('dd/MM/yyyy')
-                      .format(date)), // Use formatted date here
                 );
               },
             );
